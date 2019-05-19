@@ -1,5 +1,7 @@
 package libfunc
 
+import "fmt"
+
 func Stage0() func([]int, int) []int {
 
 	multiply := func(values []int, multiplier int) []int {
@@ -59,5 +61,56 @@ func StringThing() {
 	//stringStream :=
 	//
 	//addString(done, )
+
+}
+
+func Adder() {
+	generator := func(done <-chan interface{}, ints ...int) <-chan int {
+		iStream := make(chan int)
+		go func() {
+			defer close(iStream)
+			for _, i := range ints {
+				select {
+				case <-done:
+					return
+				case iStream <- i:
+				}
+			}
+		}()
+		return iStream
+	}
+
+	add := func(
+		done <-chan interface{},
+		iStream <-chan int,
+
+	) <-chan int {
+
+		bucketStream := make(chan int)
+		acc := 0
+		go func() {
+			defer close(bucketStream)
+			for i := range iStream {
+				select {
+				case <-done:
+					return
+				case bucketStream <- i + acc:
+					acc = acc + i
+				}
+			}
+		}()
+		return bucketStream
+	}
+
+	done := make(chan interface{})
+	defer close(done)
+
+	ss := generator(done, 1, 2, 3, 4)
+
+	pipeline := add(done, ss)
+
+	for p := range pipeline {
+		fmt.Println(p)
+	}
 
 }
